@@ -515,7 +515,7 @@ class UploadSubmissionTask(SubmissionTask):
 
     PUT_OBJECT_BLOCKLIST = ["ChecksumType", "MpuObjectSize"]
 
-    CREATE_MULTIPART_BLOCKLIST = FULL_OBJECT_CHECKSUM_ARGS + ["MpuObjectSize"]
+    CREATE_MULTIPART_BLOCKLIST = FULL_OBJECT_CHECKSUM_ARGS + ["MpuObjectSize", "IfNoneMatch"]
 
     UPLOAD_PART_ARGS = [
         'ChecksumAlgorithm',
