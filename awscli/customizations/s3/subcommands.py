@@ -642,6 +642,12 @@ BUCKET_REGION = {
     ),
 }
 
+NO_OVERWRITE = {
+    'name': 'no-overwrite',
+    'action': 'store_true',
+    'help_text':('To upload only those files that not on destination'),
+}
+
 TRANSFER_ARGS = [
     DRYRUN,
     QUIET,
@@ -794,6 +800,7 @@ class ListCommand(S3Command):
             else:
                 filename = content['Key']
             print_str = last_mod_str + ' ' + size_str + ' ' + filename + '\n'
+            LOGGER.debug("HERE %s",filename) #Change here
             uni_print(print_str)
         self._at_first_page = False
 
@@ -1057,7 +1064,7 @@ class CpCommand(S3TransferCommand):
             }
         ]
         + TRANSFER_ARGS
-        + [METADATA, COPY_PROPS, METADATA_DIRECTIVE, EXPECTED_SIZE, RECURSIVE]
+        + [METADATA, COPY_PROPS, METADATA_DIRECTIVE, EXPECTED_SIZE, RECURSIVE, NO_OVERWRITE]
     )
 
 
@@ -1081,6 +1088,7 @@ class MvCommand(S3TransferCommand):
             METADATA_DIRECTIVE,
             RECURSIVE,
             VALIDATE_SAME_S3_PATHS,
+            NO_OVERWRITE,
         ]
     )
 
@@ -1403,6 +1411,7 @@ class CommandArchitecture:
                 'file_info_builder': [file_info_builder],
                 's3_handler': [s3_transfer_handler],
             }
+            
         elif self.cmd == 'cp' and self.parameters['is_stream']:
             command_dict = {
                 'setup': [stream_file_info],

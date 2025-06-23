@@ -24,6 +24,7 @@ ALLOWED_DOWNLOAD_ARGS = [
     'SSECustomerKeyMD5',
     'RequestPayer',
     'ExpectedBucketOwner',
+    # 'IfNoneMatch',
 ]
 
 FULL_OBJECT_CHECKSUM_ARGS = [

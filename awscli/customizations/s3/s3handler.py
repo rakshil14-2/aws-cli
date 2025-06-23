@@ -137,6 +137,7 @@ class S3TransferHandler:
             self._result_command_recorder.result_queue,
             cli_params,
         )
+        LOGGER.debug("=============Submitter args %s ", submitter_args)
         self._submitters = [
             UploadStreamRequestSubmitter(*submitter_args),
             DownloadStreamRequestSubmitter(*submitter_args),
@@ -359,8 +360,9 @@ class BaseTransferRequestSubmitter:
 
 class UploadRequestSubmitter(BaseTransferRequestSubmitter):
     REQUEST_MAPPER_METHOD = RequestParamsMapper.map_put_object_params
-
+    LOGGER.debug("=====================%s", REQUEST_MAPPER_METHOD)
     def can_submit(self, fileinfo):
+        LOGGER.debug("=====================%s", fileinfo)
         return fileinfo.operation_name == 'upload'
 
     def _add_additional_subscribers(self, subscribers, fileinfo):
@@ -370,6 +372,7 @@ class UploadRequestSubmitter(BaseTransferRequestSubmitter):
             subscribers.append(DeleteSourceFileSubscriber())
 
     def _submit_transfer_request(self, fileinfo, extra_args, subscribers):
+        LOGGER.debug("IN UPLoadddddddddd")
         bucket, key = find_bucket_key(fileinfo.dest)
         filein = self._get_filein(fileinfo)
         return self._transfer_manager.upload(
@@ -471,6 +474,7 @@ class CopyRequestSubmitter(BaseTransferRequestSubmitter):
         bucket, key = find_bucket_key(fileinfo.dest)
         source_bucket, source_key = find_bucket_key(fileinfo.src)
         copy_source = {'Bucket': source_bucket, 'Key': source_key}
+        LOGGER.debug("IN COPYyyyyyyyyyy")
         return self._transfer_manager.copy(
             bucket=bucket,
             key=key,
@@ -490,6 +494,7 @@ class CopyRequestSubmitter(BaseTransferRequestSubmitter):
 
 
 class UploadStreamRequestSubmitter(UploadRequestSubmitter):
+    LOGGER.debug("IN STREAAM========")
     def can_submit(self, fileinfo):
         return fileinfo.operation_name == 'upload' and self._cli_params.get(
             'is_stream'

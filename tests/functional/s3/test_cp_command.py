@@ -50,6 +50,46 @@ class TestCPCommand(BaseCPCommandTest):
             len(self.operations_called), 1, self.operations_called
         )
         self.assertEqual(self.operations_called[0][0].name, 'PutObject')
+    
+    # Changed here
+
+    def test_no_overwrite_flag_when_object_is_with_different_key_name(self):
+        """Test that --no-overwrite successfully upload to S3 bucket when key is not same"""
+        full_path = self.files.create_file('foo.txt', 'mycontent')
+        cmdline = '%s %s s3://bucket/key.txt --no-overwrite' % (self.prefix, full_path)
+        self.parsed_responses = [
+            {'ETag': '"c8afdb36c52cf4727836669019e69222"'}
+        ]
+        self.run_cmd(cmdline, expected_rc=0)
+        #Verify putObject was called
+        self.assertEqual(
+            len(self.operations_called), 1, self.operations_called
+        )
+        self.assertEqual(self.operations_called[0][0].name, 'PutObject')
+        # Verify the IfNoneMatch condition was set in the request
+        self.assertEqual(self.operations_called[0][1]['IfNoneMatch'], '*')
+    
+    def test_no_overwrite_flag_when_object_with_same_key_present_at_target(self):
+        """Test that --no-overwrite does not upload to S3 bucket when key is same"""
+        full_path = self.files.create_file('foo.txt', 'mycontent')
+        cmdline = '%s %s s3://bucket/key.txt --no-overwrite' % (self.prefix, full_path)
+        # Set up the response to simulate a PreconditionFailed error
+        self.http_response.status_code = 412
+        self.parsed_responses = [
+            {
+                'Error': {
+                    'Code': 'PreconditionFailed',
+                    'Message': 'At least one of the pre-conditions you specified did not hold'
+                }
+            }
+        ]
+        _, stderr, rc = self.run_cmd(cmdline, expected_rc=1)
+        # Verify that the error message is printed to stderr
+        self.assertIn('PreconditionFailed', stderr)
+        # Verify the IfNoneMatch condition was set in the request
+        self.assertEqual(self.operations_called[0][1]['IfNoneMatch'], '*')
+
+
 
     def test_key_name_added_when_only_bucket_provided(self):
         full_path = self.files.create_file('foo.txt', 'mycontent')

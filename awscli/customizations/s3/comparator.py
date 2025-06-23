@@ -76,6 +76,7 @@ class Comparator:
         # :var dest_take: Take the next dest file from the generated files if
         #     true
         dest_take = True
+        potential_dest_file = []
         while True:
             try:
                 if (not src_done) and src_take:
@@ -89,13 +90,15 @@ class Comparator:
             except StopIteration:
                 dest_file = None
                 dest_done = True
-
+            # When both done no files
+            LOG.debug("SRC Remainging %s",src_done)
+            LOG.debug("DEST Remainging %s", dest_done)
             if (not src_done) and (not dest_done):
                 src_take = True
                 dest_take = True
 
                 compare_keys = self.compare_comp_key(src_file, dest_file)
-
+                # May be files same
                 if compare_keys == 'equal':
                     should_sync = self._sync_strategy.determine_should_sync(
                         src_file, dest_file
@@ -111,6 +114,8 @@ class Comparator:
                         )
                     )
                     if should_sync:
+                        # Potential strategy My way point
+                        LOG.debug("HERRRRRREEEEE")
                         yield src_file
 
                 elif compare_keys == 'greater_than':
@@ -132,7 +137,9 @@ class Comparator:
                     )
                 )
                 if should_sync:
-                    yield src_file
+                   LOG.debug("HERRRRRREEE=======EE %s", src_file.src)
+                   potential_dest_file.append(src_file.src)
+                   yield src_file
 
             elif src_done and (not dest_done):
                 dest_take = True
@@ -144,6 +151,8 @@ class Comparator:
                 if should_sync:
                     yield dest_file
             else:
+                #No more syncing
+                LOG.debug("No more syncing %s", potential_dest_file)
                 break
 
     def compare_comp_key(self, src_file, dest_file):

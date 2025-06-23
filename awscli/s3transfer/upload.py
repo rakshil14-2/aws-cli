@@ -12,6 +12,7 @@
 # language governing permissions and limitations under the License.
 import math
 from io import BytesIO
+import logging
 
 from s3transfer.compat import readable, seekable
 from s3transfer.constants import FULL_OBJECT_CHECKSUM_ARGS
@@ -28,7 +29,7 @@ from s3transfer.utils import (
     get_callbacks,
     get_filtered_dict,
 )
-
+LOGGER = logging.getLogger(__name__)
 
 class AggregatedProgressCallback:
     def __init__(self, callbacks, threshold=1024 * 256):
@@ -515,7 +516,7 @@ class UploadSubmissionTask(SubmissionTask):
 
     PUT_OBJECT_BLOCKLIST = ["ChecksumType", "MpuObjectSize"]
 
-    CREATE_MULTIPART_BLOCKLIST = FULL_OBJECT_CHECKSUM_ARGS + ["MpuObjectSize"]
+    CREATE_MULTIPART_BLOCKLIST = FULL_OBJECT_CHECKSUM_ARGS + ["MpuObjectSize", "IfNoneMatch"]
 
     UPLOAD_PART_ARGS = [
         'ChecksumAlgorithm',
@@ -534,6 +535,7 @@ class UploadSubmissionTask(SubmissionTask):
         'ExpectedBucketOwner',
         'ChecksumType',
         'MpuObjectSize',
+        "IfNoneMatch"
     ] + FULL_OBJECT_CHECKSUM_ARGS
 
     def _get_upload_input_manager_cls(self, transfer_future):
@@ -590,7 +592,7 @@ class UploadSubmissionTask(SubmissionTask):
         upload_input_manager = self._get_upload_input_manager_cls(
             transfer_future
         )(osutil, self._transfer_coordinator, bandwidth_limiter)
-
+        #Check here
         # Determine the size if it was not provided
         if transfer_future.meta.size is None:
             upload_input_manager.provide_transfer_size(transfer_future)
@@ -631,6 +633,7 @@ class UploadSubmissionTask(SubmissionTask):
         put_object_extra_args = self._extra_put_object_args(
             call_args.extra_args
         )
+        LOGGER.debug("============HERE %s ", put_object_extra_args)
 
         # Get any tags that need to be associated to the put object task
         put_object_tag = self._get_upload_task_tag(
@@ -667,6 +670,7 @@ class UploadSubmissionTask(SubmissionTask):
     ):
         call_args = transfer_future.meta.call_args
 
+
         # When a user provided checksum is passed, set "ChecksumType" to "FULL_OBJECT"
         # and "ChecksumAlgorithm" to the related algorithm.
         for checksum in FULL_OBJECT_CHECKSUM_ARGS:
@@ -679,6 +683,9 @@ class UploadSubmissionTask(SubmissionTask):
         create_multipart_extra_args = self._extra_create_multipart_args(
             call_args.extra_args
         )
+
+        #
+        LOGGER.debug("==========ARGS in create_multipart %s ",create_multipart_extra_args)
 
         # Submit the request to create a multipart upload.
         create_multipart_future = self._transfer_coordinator.submit(
