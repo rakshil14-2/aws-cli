@@ -1467,7 +1467,6 @@ class CommandArchitecture:
         # tasks will give a 2 RC.  Otherwise a RC of zero is returned.
         rc = 0
         if files[0].num_tasks_failed > 0:
-            LOGGER.debug("Number of tasks failed: %s", files[0].num_tasks_failed)
             rc = 1
         elif files[0].num_tasks_warned > 0:
             rc = 2

@@ -534,6 +534,7 @@ class UploadSubmissionTask(SubmissionTask):
         'ExpectedBucketOwner',
         'ChecksumType',
         'MpuObjectSize',
+        'IfNoneMatch',
     ] + FULL_OBJECT_CHECKSUM_ARGS
 
     def _get_upload_input_manager_cls(self, transfer_future):
