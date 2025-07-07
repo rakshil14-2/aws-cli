@@ -16,6 +16,7 @@ import os
 from s3transfer.manager import TransferManager
 
 from awscli.compat import get_binary_stdin
+from botocore.exceptions import ClientError
 from awscli.customizations.s3.results import (
     CommandResultRecorder,
     DoneResultSubscriber,
@@ -425,6 +426,12 @@ class DownloadRequestSubmitter(BaseTransferRequestSubmitter):
     def _submit_transfer_request(self, fileinfo, extra_args, subscribers):
         bucket, key = find_bucket_key(fileinfo.src)
         fileout = self._get_fileout(fileinfo)
+        LOGGER.info(" SOURCE FILE %s", fileinfo.src)
+        LOGGER.info(" DEST FILE %s", fileout)
+        if self._cli_params.get('no_overwrite'):
+            if self._check_object_at_destination(fileout):
+                self._handle_object_exists_warning(fileout)
+                return None
         return self._transfer_manager.download(
             fileobj=fileout,
             bucket=bucket,
@@ -432,6 +439,19 @@ class DownloadRequestSubmitter(BaseTransferRequestSubmitter):
             extra_args=extra_args,
             subscribers=subscribers,
         )
+    
+    def _check_object_at_destination(self, fileout):
+        if os.path.exists(fileout):
+            return True
+        else:
+            return False
+    
+    def _handle_object_exists_warning(self, fileout):
+        error_message = f"It already exists on {fileout}"
+        warning = create_warning(
+            "", error_message, skip_file=True
+        )
+        self._result_queue.put(warning)
 
     def _get_fileout(self, fileinfo):
         return fileinfo.dest
@@ -471,6 +491,16 @@ class CopyRequestSubmitter(BaseTransferRequestSubmitter):
         bucket, key = find_bucket_key(fileinfo.dest)
         source_bucket, source_key = find_bucket_key(fileinfo.src)
         copy_source = {'Bucket': source_bucket, 'Key': source_key}
+        LOGGER.info("SOURCE FILE %s", fileinfo.src)
+        LOGGER.info("DEST FILE %s", fileinfo.dest)
+        LOGGER.debug(" I am here !!!")
+        LOGGER.debug(" I am here !!! %s ", self._cli_params.get('no_overwrite'))
+        # Check to prevent no-overwrite
+        if self._cli_params.get('no_overwrite'):
+            LOGGER.info("I have params OVErwrite")
+            if self._check_object_at_destination(bucket,key):
+                self._handle_object_exists_warning(fileinfo, source_bucket,source_key)
+                return None
         return self._transfer_manager.copy(
             bucket=bucket,
             key=key,
@@ -479,6 +509,27 @@ class CopyRequestSubmitter(BaseTransferRequestSubmitter):
             subscribers=subscribers,
             source_client=fileinfo.source_client,
         )
+
+    def _check_object_at_destination(self, bucket,key):
+        """This method checks if object exists on destination or not"""
+
+        #Alogrithm for object existence: Use HEAD object API to verify if the target object exists.
+        # If found, skip transfer; if not found, proceed with transfer operation.
+        try:
+            output = self._transfer_manager.client.head_object(Bucket=bucket, Key=key)
+            return True
+        except Exception as e:
+            if e.response['Error']['Code'] == '404':
+                return False
+
+    def _handle_object_exists_warning(self,fileinfo, bucket, key):
+        """This method handles the object exists warning"""
+        error_message = f"as it already exists on {fileinfo.dest}"
+        warning = create_warning(
+            "s3://%s/%s" % (bucket, key), error_message, skip_file=True
+        )
+        self._result_queue.put(warning)
+    
 
     def _get_warning_handlers(self):
         return [self._warn_glacier]

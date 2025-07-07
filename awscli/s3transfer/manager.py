@@ -210,6 +210,7 @@ class TransferManager:
         'CopySourceSSECustomerKeyMD5',
         'MetadataDirective',
         'TaggingDirective',
+        'IfNoneMatch',
     ]
 
     ALLOWED_DELETE_ARGS = [

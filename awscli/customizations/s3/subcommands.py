@@ -1347,6 +1347,11 @@ class CommandArchitecture:
         result_queue = queue.Queue()
         operation_name = cmd_translation[paths_type]
 
+        s3_handler_params = self.parameters.copy()
+        if self.cmd == 'sync':
+            s3_handler_params['no_overwrite'] = False
+
+
         fgen_kwargs = {
             'client': self._source_client,
             'operation_name': operation_name,
@@ -1394,7 +1399,7 @@ class CommandArchitecture:
             self._client, self._source_client, self.parameters
         )
 
-        s3_transfer_handler = S3TransferHandlerFactory(self.parameters)(
+        s3_transfer_handler = S3TransferHandlerFactory(s3_handler_params)(
             self._transfer_manager, result_queue
         )
 
@@ -1448,6 +1453,8 @@ class CommandArchitecture:
             instruction = self.instructions.pop(0)
             file_list = []
             components = command_dict[instruction]
+            if components == 'comparator':
+                LOGGER.info("a After comaprison")
             for i in range(len(components)):
                 if len(files) > len(components):
                     file_list.append(components[i].call(*files))
