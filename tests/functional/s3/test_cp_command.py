@@ -321,7 +321,7 @@ class TestCPCommand(BaseCPCommandTest):
                 'Error': {
                     'Code': 'PreconditionFailed',
                     'Message': 'At least one of the pre-conditions you specified did not hold',
-                    'Condition': 'If-None-match'
+                    'Condition': 'If-None-Match'
                 }
             }
         ]
@@ -368,7 +368,7 @@ class TestCPCommand(BaseCPCommandTest):
                 'Error': {
                     'Code': 'PreconditionFailed',
                     'Message': 'At least one of the pre-conditions you specified did not hold',
-                    'Condition': 'If-None-match'
+                    'Condition': 'If-None-Match'
                 }
             },  # PreconditionFailed error for CompleteMultipart Upload
             {}  # AbortMultipartUpload response                
