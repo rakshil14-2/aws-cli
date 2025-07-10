@@ -340,7 +340,7 @@ class TestMvCommand(BaseS3TransferCommandTest):
                 'Error': {
                     'Code': 'PreconditionFailed',
                     'Message': 'At least one of the pre-conditions you specified did not hold',
-                    'Condition': 'If-None-match'
+                    'Condition': 'If-None-Match'
                 }
             }
         ]
@@ -390,7 +390,7 @@ class TestMvCommand(BaseS3TransferCommandTest):
                 'Error': {
                     'Code': 'PreconditionFailed',
                     'Message': 'At least one of the pre-conditions you specified did not hold',
-                    'Condition': 'If-None-match'
+                    'Condition': 'If-None-Match'
                 }
             },  # CompleteMultipartUpload response
             {}  # Abort Multipart
