@@ -317,13 +317,11 @@ class TestNonMultipartCopy(BaseCopyTest):
         }
         with self.assertRaisesRegex(ValueError, 'methods do not support'):
             self.manager.copy(source, self.bucket, self.key)
-    
+
     def test_copy_with_no_overwrite_flag_when_object_is_of_zero_size(self):
-        # Test with no-overwrite flag on a zero sized object the operation uses regular copy
         # Set up IfNoneMatch in extra_args
         self.extra_args['IfNoneMatch'] = '*'
         # Override the content with zero-length content
-        original_content = self.content
         self.content = b''
         # Add head object response with ContentLength 0
         expected_head_params = {
@@ -345,7 +343,7 @@ class TestNonMultipartCopy(BaseCopyTest):
         future = self.manager.copy(**call_kwargs)
         future.result()
         self.stubber.assert_no_pending_responses()
-        
+
 
 class TestMultipartCopy(BaseCopyTest):
     __test__ = True
@@ -735,18 +733,21 @@ class TestMultipartCopy(BaseCopyTest):
         future.result()
         self.stubber.assert_no_pending_responses()
 
-    def test_copy_with_no_overwrite_flag_when_small_object_exists_at_target(self):
+    def test_copy_with_no_overwrite_flag_when_small_object_exists_at_target(
+        self,
+    ):
         """Test with no-overwrite flag on a non-zero small object size (below multipart threshold),
-        the operation still uses multipart copy and fails when the object exists at the destination."""
+        the operation uses multipart copy and fails when the object exists at the destination."""
         # Set up IfNoneMatch in extra_args
         self.extra_args['IfNoneMatch'] = '*'
         # Setting up the size of object
         small_content_size = 5
-        original_content = self.content
         self.content = b'0' * small_content_size
         # Add head object response with small content size
         head_response = self.create_stubbed_responses()[0]
-        head_response['service_response'] = {'ContentLength': small_content_size}
+        head_response['service_response'] = {
+            'ContentLength': small_content_size
+        }
         self.stubber.add_response(**head_response)
         # Should use multipart upload
         # Add create_multipart_upload response
@@ -756,7 +757,7 @@ class TestMultipartCopy(BaseCopyTest):
             expected_params={
                 'Bucket': self.bucket,
                 'Key': self.key,
-            }
+            },
         )
         # Add upload_part_copy response
         self.stubber.add_response(
@@ -769,7 +770,7 @@ class TestMultipartCopy(BaseCopyTest):
                 'UploadId': self.multipart_id,
                 'PartNumber': 1,
                 'CopySourceRange': f'bytes=0-{small_content_size-1}',
-            }
+            },
         )
         # Mock a PreconditionFailed error for complete_multipart_upload
         self.stubber.add_client_error(
@@ -782,12 +783,10 @@ class TestMultipartCopy(BaseCopyTest):
                 'Key': self.key,
                 'UploadId': self.multipart_id,
                 'MultipartUpload': {
-                    'Parts': [
-                        {'ETag': 'etag-1', 'PartNumber': 1}
-                    ]
+                    'Parts': [{'ETag': 'etag-1', 'PartNumber': 1}]
                 },
-                'IfNoneMatch': '*'
-            }
+                'IfNoneMatch': '*',
+            },
         )
         # Add abort_multipart_upload response
         self.stubber.add_response(
@@ -797,28 +796,33 @@ class TestMultipartCopy(BaseCopyTest):
                 'Bucket': self.bucket,
                 'Key': self.key,
                 'UploadId': self.multipart_id,
-            }
+            },
         )
         call_kwargs = self.create_call_kwargs()
         call_kwargs['extra_args'] = self.extra_args
         future = self.manager.copy(**call_kwargs)
         with self.assertRaises(ClientError) as context:
             future.result()
-        self.assertEqual(context.exception.response['Error']['Code'], 'PreconditionFailed')
+        self.assertEqual(
+            context.exception.response['Error']['Code'], 'PreconditionFailed'
+        )
         self.stubber.assert_no_pending_responses()
-        
-    def test_copy_with_no_overwrite_flag_when_small_object_not_exists_at_target(self):
+
+    def test_copy_with_no_overwrite_flag_when_small_object_not_exists_at_target(
+        self,
+    ):
         """Test with no-overwrite flag on a non-zero small object size (below multipart threshold),
         the operation uses multipart copy and succeeds when the object doesn't exist at the destination."""
         # Set up IfNoneMatch in extra_args
         self.extra_args['IfNoneMatch'] = '*'
         # Setting up the size of object
         small_content_size = 5
-        original_content = self.content
         self.content = b'0' * small_content_size
         # Add head object response with small content size
         head_response = self.create_stubbed_responses()[0]
-        head_response['service_response'] = {'ContentLength': small_content_size}
+        head_response['service_response'] = {
+            'ContentLength': small_content_size
+        }
         self.stubber.add_response(**head_response)
         # Should use multipart copy
         # Add create_multipart_upload response
@@ -828,7 +832,7 @@ class TestMultipartCopy(BaseCopyTest):
             expected_params={
                 'Bucket': self.bucket,
                 'Key': self.key,
-            }
+            },
         )
         # Add upload_part_copy response
         self.stubber.add_response(
@@ -841,7 +845,7 @@ class TestMultipartCopy(BaseCopyTest):
                 'UploadId': self.multipart_id,
                 'PartNumber': 1,
                 'CopySourceRange': f'bytes=0-{small_content_size-1}',
-            }
+            },
         )
         self.stubber.add_response(
             'complete_multipart_upload',
@@ -851,12 +855,10 @@ class TestMultipartCopy(BaseCopyTest):
                 'Key': self.key,
                 'UploadId': self.multipart_id,
                 'MultipartUpload': {
-                    'Parts': [
-                        {'ETag': 'etag-1', 'PartNumber': 1}
-                    ]
+                    'Parts': [{'ETag': 'etag-1', 'PartNumber': 1}]
                 },
-                'IfNoneMatch': '*'
-            }
+                'IfNoneMatch': '*',
+            },
         )
         call_kwargs = self.create_call_kwargs()
         call_kwargs['extra_args'] = self.extra_args
@@ -864,7 +866,9 @@ class TestMultipartCopy(BaseCopyTest):
         future.result()
         self.stubber.assert_no_pending_responses()
 
-    def test_copy_with_no_overwrite_flag_when_large_object_exists_at_target(self):
+    def test_copy_with_no_overwrite_flag_when_large_object_exists_at_target(
+        self,
+    ):
         """Test with no-overwrite flag on a large object size (above multipart threshold),
         the operation uses multipart copy and fails when the object exists at the destination."""
         # Set up IfNoneMatch in extra_args
@@ -888,11 +892,11 @@ class TestMultipartCopy(BaseCopyTest):
                     'Parts': [
                         {'ETag': 'etag-1', 'PartNumber': 1},
                         {'ETag': 'etag-2', 'PartNumber': 2},
-                        {'ETag': 'etag-3', 'PartNumber': 3}
+                        {'ETag': 'etag-3', 'PartNumber': 3},
                     ]
                 },
-                'IfNoneMatch': '*'
-            }
+                'IfNoneMatch': '*',
+            },
         )
         # Add abort_multipart_upload response
         self.stubber.add_response(
@@ -902,17 +906,21 @@ class TestMultipartCopy(BaseCopyTest):
                 'Bucket': self.bucket,
                 'Key': self.key,
                 'UploadId': self.multipart_id,
-            }
+            },
         )
         call_kwargs = self.create_call_kwargs()
         call_kwargs['extra_args'] = self.extra_args
         future = self.manager.copy(**call_kwargs)
         with self.assertRaises(ClientError) as context:
             future.result()
-        self.assertEqual(context.exception.response['Error']['Code'], 'PreconditionFailed')
+        self.assertEqual(
+            context.exception.response['Error']['Code'], 'PreconditionFailed'
+        )
         self.stubber.assert_no_pending_responses()
-        
-    def test_copy_with_no_overwrite_flag_when_large_object_not_exists_at_target(self):
+
+    def test_copy_with_no_overwrite_flag_when_large_object_not_exists_at_target(
+        self,
+    ):
         """Test with no-overwrite on a large object size (above multipart threshold),
         the operation uses multipart copy and succeeds when the object doesn't exist at the destination."""
         # Set up IfNoneMatch in extra_args
@@ -934,11 +942,11 @@ class TestMultipartCopy(BaseCopyTest):
                     'Parts': [
                         {'ETag': 'etag-1', 'PartNumber': 1},
                         {'ETag': 'etag-2', 'PartNumber': 2},
-                        {'ETag': 'etag-3', 'PartNumber': 3}
+                        {'ETag': 'etag-3', 'PartNumber': 3},
                     ]
                 },
-                'IfNoneMatch': '*'
-            }
+                'IfNoneMatch': '*',
+            },
         )
         call_kwargs = self.create_call_kwargs()
         call_kwargs['extra_args'] = self.extra_args

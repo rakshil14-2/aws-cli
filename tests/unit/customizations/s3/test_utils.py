@@ -871,21 +871,18 @@ class TestRequestParamsMapperNoOverwrite(unittest.TestCase):
         cli_params = {}
         RequestParamsMapper.map_put_object_params(request_params, cli_params)
         self.assertNotIn('IfNoneMatch', request_params)
-    
+
     def test_map_copy_object_params_with_no_overwrite(self):
-        # Test that map_copy_object_params correctly sets IfNoneMatch when no_overwrite is True
         request_params = {}
         cli_params = {'no_overwrite': True}
         RequestParamsMapper.map_copy_object_params(request_params, cli_params)
         self.assertEqual(request_params['IfNoneMatch'], '*')
-        
+
     def test_map_copy_object_params_without_no_overwrite(self):
-        # Test that map_copy_object_params doesn't set IfNoneMatch when no_overwrite is not present
         request_params = {}
         cli_params = {}
         RequestParamsMapper.map_copy_object_params(request_params, cli_params)
         self.assertNotIn('IfNoneMatch', request_params)
-
 
 
 class TestS3PathResolver:

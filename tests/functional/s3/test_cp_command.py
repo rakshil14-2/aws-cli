@@ -396,7 +396,7 @@ class TestCPCommand(BaseCPCommandTest):
         # Verify the IfNoneMatch condition was set in the CompleteMultipartUpload request
         self.assertEqual(self.operations_called[3][1]['IfNoneMatch'], '*')
 
-    def test_for_no_overwrite_flag_on_copy_when_small_object_does_not_exist_on_target(
+    def test_no_overwrite_flag_on_copy_when_small_object_does_not_exist_on_target(
         self,
     ):
         cmdline = f'{self.prefix} s3://bucket1/key.txt s3://bucket/key.txt --no-overwrite'
@@ -421,7 +421,7 @@ class TestCPCommand(BaseCPCommandTest):
         # Verify the IfNoneMatch condition was set in the CompleteMultipartUpload request
         self.assertEqual(self.operations_called[3][1]['IfNoneMatch'], '*')
 
-    def test_for_no_overwrite_flag_on_copy_when_small_object_exists_on_target(
+    def test_no_overwrite_flag_on_copy_when_small_object_exists_on_target(
         self,
     ):
         cmdline = f'{self.prefix} s3://bucket1/key.txt s3://bucket/key.txt --no-overwrite'
@@ -457,7 +457,7 @@ class TestCPCommand(BaseCPCommandTest):
         # Verify the IfNoneMatch condition was set in the CompleteMultipartUpload request
         self.assertEqual(self.operations_called[3][1]['IfNoneMatch'], '*')
 
-    def test_for_no_overwrite_flag_on_copy_when_object_is_of_zero_size(self):
+    def test_no_overwrite_flag_on_copy_when_object_is_of_zero_size(self):
         cmdline = f'{self.prefix} s3://bucket1/file.txt s3://bucket2/file.txt --no-overwrite'
         self.parsed_responses = [
             {
@@ -476,7 +476,7 @@ class TestCPCommand(BaseCPCommandTest):
         self.assertEqual(self.operations_called[0][0].name, 'HeadObject')
         self.assertEqual(self.operations_called[1][0].name, 'CopyObject')
 
-    def test_for_no_overwrite_flag_on_copy_when_large_object_exists_on_target(
+    def test_no_overwrite_flag_on_copy_when_large_object_exists_on_target(
         self,
     ):
         cmdline = f'{self.prefix} s3://bucket1/key.txt s3://bucket/key.txt --no-overwrite'
@@ -522,7 +522,7 @@ class TestCPCommand(BaseCPCommandTest):
         # Verify the IfNoneMatch condition was set in the CompleteMultipartUpload request
         self.assertEqual(self.operations_called[5][1]['IfNoneMatch'], '*')
 
-    def test_for_no_overwrite_flag_on_copy_when_large_object_does_not_exist_on_target(
+    def test_no_overwrite_flag_on_copy_when_large_object_does_not_exist_on_target(
         self,
     ):
         cmdline = f'{self.prefix} s3://bucket1/key.txt s3://bucket/key.txt --no-overwrite'
