@@ -295,9 +295,8 @@ class TestCPCommand(BaseCPCommandTest):
             len(self.operations_called), 1, self.operations_called
         )
         self.assertEqual(self.operations_called[0][0].name, 'ListObjectsV2')
-    
-    def test_for_no_overwrite_flag_when_object_not_exists_on_target(self):
-        """Testing when object with different key is successsfully uploaded using no-overwrite"""
+
+    def test_no_overwrite_flag_when_object_not_exists_on_target(self):
         full_path = self.files.create_file('foo.txt', 'mycontent')
         cmdline = f'{self.prefix} {full_path} s3://bucket --no-overwrite'
         self.parsed_responses = [
@@ -309,9 +308,8 @@ class TestCPCommand(BaseCPCommandTest):
         self.assertEqual(self.operations_called[0][0].name, 'PutObject')
         # Verify the IfNoneMatch condition was set in the request
         self.assertEqual(self.operations_called[0][1]['IfNoneMatch'], '*')
-    
-    def test_for_no_overwrite_flag_when_object_exists_on_target(self):
-        """Testing when object already exists using no-overwrite"""
+
+    def test_no_overwrite_flag_when_object_exists_on_target(self):
         full_path = self.files.create_file('foo.txt', 'mycontent')
         cmdline = f'{self.prefix} {full_path} s3://bucket --no-overwrite'
         # Set up the response to simulate a PreconditionFailed error
@@ -321,7 +319,7 @@ class TestCPCommand(BaseCPCommandTest):
                 'Error': {
                     'Code': 'PreconditionFailed',
                     'Message': 'At least one of the pre-conditions you specified did not hold',
-                    'Condition': 'If-None-Match'
+                    'Condition': 'If-None-Match',
                 }
             }
         ]
@@ -331,31 +329,37 @@ class TestCPCommand(BaseCPCommandTest):
         self.assertEqual(self.operations_called[0][0].name, 'PutObject')
         self.assertEqual(self.operations_called[0][1]['IfNoneMatch'], '*')
 
-    def test_for_no_overwrite_flag_multipart_upload_when_object_not_exists_on_target(self):
-        """Testing multipart upload with no-overwrite flag when object doesn't exist"""
+    def test_no_overwrite_flag_multipart_upload_when_object_not_exists_on_target(
+        self,
+    ):
         # Create a large file that will trigger multipart upload
         full_path = self.files.create_file('foo.txt', 'a' * 10 * (1024**2))
         cmdline = f'{self.prefix} {full_path} s3://bucket --no-overwrite'
-    
+
         # Set up responses for multipart upload
         self.parsed_responses = [
             {'UploadId': 'foo'},  # CreateMultipartUpload response
             {'ETag': '"foo-1"'},  # UploadPart response
             {'ETag': '"foo-2"'},  # UploadPart response
-            {}                    # CompleteMultipartUpload response
+            {},  # CompleteMultipartUpload response
         ]
         self.run_cmd(cmdline, expected_rc=0)
         # Verify all multipart operations were called
         self.assertEqual(len(self.operations_called), 4)
-        self.assertEqual(self.operations_called[0][0].name, 'CreateMultipartUpload')
+        self.assertEqual(
+            self.operations_called[0][0].name, 'CreateMultipartUpload'
+        )
         self.assertEqual(self.operations_called[1][0].name, 'UploadPart')
         self.assertEqual(self.operations_called[2][0].name, 'UploadPart')
-        self.assertEqual(self.operations_called[3][0].name, 'CompleteMultipartUpload')
+        self.assertEqual(
+            self.operations_called[3][0].name, 'CompleteMultipartUpload'
+        )
         # Verify the IfNoneMatch condition was set in the CompleteMultipartUpload request
         self.assertEqual(self.operations_called[3][1]['IfNoneMatch'], '*')
 
-    def test_for_no_overwrite_flag_multipart_upload_when_object_exists_on_target(self):
-        """Testing multipart upload with no-overwrite flag when object already exist"""
+    def test_no_overwrite_flag_multipart_upload_when_object_exists_on_target(
+        self,
+    ):
         # Create a large file that will trigger multipart upload
         full_path = self.files.create_file('foo.txt', 'a' * 10 * (1024**2))
         cmdline = f'{self.prefix} {full_path} s3://bucket --no-overwrite'
@@ -368,10 +372,10 @@ class TestCPCommand(BaseCPCommandTest):
                 'Error': {
                     'Code': 'PreconditionFailed',
                     'Message': 'At least one of the pre-conditions you specified did not hold',
-                    'Condition': 'If-None-Match'
+                    'Condition': 'If-None-Match',
                 }
             },  # PreconditionFailed error for CompleteMultipart Upload
-            {}  # AbortMultipartUpload response                
+            {},  # AbortMultipartUpload response
         ]
         # Checking for success as file is skipped
         self.run_cmd(cmdline, expected_rc=0)
@@ -379,14 +383,20 @@ class TestCPCommand(BaseCPCommandTest):
         self.http_response.status_code = 412
         # Verify all multipart operations were called
         self.assertEqual(len(self.operations_called), 5)
-        self.assertEqual(self.operations_called[0][0].name, 'CreateMultipartUpload')
+        self.assertEqual(
+            self.operations_called[0][0].name, 'CreateMultipartUpload'
+        )
         self.assertEqual(self.operations_called[1][0].name, 'UploadPart')
         self.assertEqual(self.operations_called[2][0].name, 'UploadPart')
-        self.assertEqual(self.operations_called[3][0].name, 'CompleteMultipartUpload')
-        self.assertEqual(self.operations_called[4][0].name, 'AbortMultipartUpload')
+        self.assertEqual(
+            self.operations_called[3][0].name, 'CompleteMultipartUpload'
+        )
+        self.assertEqual(
+            self.operations_called[4][0].name, 'AbortMultipartUpload'
+        )
         # Verify the IfNoneMatch condition was set in the CompleteMultipartUpload request
         self.assertEqual(self.operations_called[3][1]['IfNoneMatch'], '*')
-    
+
     def test_dryrun_download(self):
         self.parsed_responses = [self.head_object_response()]
         target = self.files.full_path('file.txt')
