@@ -368,7 +368,6 @@ class TestNonMultipartUpload(BaseUploadTest):
             self.manager.upload(self.filename, s3_object_lambda_arn, self.key)
 
     def test_upload_with_no_overwrite_flag_when_object_exists(self):
-        """Test that upload fails when object exists at the destination"""
         self.extra_args['IfNoneMatch'] = '*'
         # Mocking a precondition Error
         self.stubber.add_client_error(
@@ -380,8 +379,8 @@ class TestNonMultipartUpload(BaseUploadTest):
                 'Bucket': self.bucket,
                 'Key': self.key,
                 'IfNoneMatch': '*',
-                'ChecksumAlgorithm': DEFAULT_CHECKSUM_ALGORITHM
-            }
+                'ChecksumAlgorithm': DEFAULT_CHECKSUM_ALGORITHM,
+            },
         )
         with self.assertRaises(ClientError) as context:
             future = self.manager.upload(
@@ -389,11 +388,12 @@ class TestNonMultipartUpload(BaseUploadTest):
             )
             future.result()
         # Verify the error is a PreconditionFailed error
-        self.assertEqual(context.exception.response['Error']['Code'], 'PreconditionFailed')
+        self.assertEqual(
+            context.exception.response['Error']['Code'], 'PreconditionFailed'
+        )
         self.stubber.assert_no_pending_responses()
 
     def test_upload_with_no_overwrite_flag_when_object_does_not_exists(self):
-        """Test that upload succeed when object does not exists at the destination"""
         self.extra_args['IfNoneMatch'] = '*'
         self.stubber.add_response(
             'put_object',
@@ -403,8 +403,8 @@ class TestNonMultipartUpload(BaseUploadTest):
                 'Bucket': self.bucket,
                 'Key': self.key,
                 'IfNoneMatch': '*',
-                'ChecksumAlgorithm': DEFAULT_CHECKSUM_ALGORITHM
-            }
+                'ChecksumAlgorithm': DEFAULT_CHECKSUM_ALGORITHM,
+            },
         )
         future = self.manager.upload(
             self.filename, self.bucket, self.key, self.extra_args
@@ -895,7 +895,6 @@ class TestMultipartUpload(BaseUploadTest):
         self.assert_expected_client_calls_were_correct()
 
     def test_multipart_upload_with_no_overwrite_flag_when_object_exists(self):
-        """Test that multipart upload fails when object exists"""
         self.extra_args['IfNoneMatch'] = '*'
         # Add response for create_multipart_upload (no IfNoneMatch here)
         self.add_create_multipart_response_with_default_expected_params()
@@ -913,13 +912,25 @@ class TestMultipartUpload(BaseUploadTest):
                 'UploadId': self.multipart_id,
                 'MultipartUpload': {
                     'Parts': [
-                        {'ETag': 'etag-1', 'PartNumber': 1, 'ChecksumCRC64NVME': 'sum1=='},
-                        {'ETag': 'etag-2', 'PartNumber': 2, 'ChecksumCRC64NVME': 'sum2=='},
-                        {'ETag': 'etag-3', 'PartNumber': 3, 'ChecksumCRC64NVME': 'sum3=='}
+                        {
+                            'ETag': 'etag-1',
+                            'PartNumber': 1,
+                            'ChecksumCRC64NVME': 'sum1==',
+                        },
+                        {
+                            'ETag': 'etag-2',
+                            'PartNumber': 2,
+                            'ChecksumCRC64NVME': 'sum2==',
+                        },
+                        {
+                            'ETag': 'etag-3',
+                            'PartNumber': 3,
+                            'ChecksumCRC64NVME': 'sum3==',
+                        },
                     ]
                 },
-                'IfNoneMatch': '*'
-            }
+                'IfNoneMatch': '*',
+            },
         )
         # Add response for abort_multipart_upload that should be called after the error
         self.stubber.add_response(
@@ -938,11 +949,14 @@ class TestMultipartUpload(BaseUploadTest):
             )
             future.result()
         # Verify the error is a PreconditionFailed error
-        self.assertEqual(context.exception.response['Error']['Code'], 'PreconditionFailed')
+        self.assertEqual(
+            context.exception.response['Error']['Code'], 'PreconditionFailed'
+        )
         self.stubber.assert_no_pending_responses()
 
-    def test_multipart_upload_with_no_overwrite_flag_when_object_does_not_exist(self):
-        """Test that multipart upload succeeds when object doesn't exist"""
+    def test_multipart_upload_with_no_overwrite_flag_when_object_does_not_exist(
+        self,
+    ):
         self.extra_args['IfNoneMatch'] = '*'
         # Add response for create_multipart_upload (no IfNoneMatch here)
         self.add_create_multipart_response_with_default_expected_params()
@@ -958,13 +972,25 @@ class TestMultipartUpload(BaseUploadTest):
                 'UploadId': self.multipart_id,
                 'MultipartUpload': {
                     'Parts': [
-                        {'ETag': 'etag-1', 'PartNumber': 1, 'ChecksumCRC64NVME': 'sum1=='},
-                        {'ETag': 'etag-2', 'PartNumber': 2, 'ChecksumCRC64NVME': 'sum2=='},
-                        {'ETag': 'etag-3', 'PartNumber': 3, 'ChecksumCRC64NVME': 'sum3=='}
+                        {
+                            'ETag': 'etag-1',
+                            'PartNumber': 1,
+                            'ChecksumCRC64NVME': 'sum1==',
+                        },
+                        {
+                            'ETag': 'etag-2',
+                            'PartNumber': 2,
+                            'ChecksumCRC64NVME': 'sum2==',
+                        },
+                        {
+                            'ETag': 'etag-3',
+                            'PartNumber': 3,
+                            'ChecksumCRC64NVME': 'sum3==',
+                        },
                     ]
                 },
-                'IfNoneMatch': '*'
-            }
+                'IfNoneMatch': '*',
+            },
         )
         # Execute the upload
         future = self.manager.upload(
