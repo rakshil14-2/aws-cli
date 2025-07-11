@@ -422,7 +422,7 @@ class TestMvCommand(BaseS3TransferCommandTest):
         # Verify source file was not deleted (failed move operation due to PreconditionFailed)
         self.assertTrue(os.path.exists(full_path))
 
-    def test_mv_no_overwrite_flag_on_copy_when_object_does_not_exist_on_target(
+    def test_mv_no_overwrite_flag_on_copy_when_small_object_does_not_exist_on_target(
         self,
     ):
         cmdline = f'{self.prefix} s3://bucket1/key.txt s3://bucket2/key.txt --no-overwrite'
@@ -450,7 +450,9 @@ class TestMvCommand(BaseS3TransferCommandTest):
         # Verify the IfNoneMatch condition was set in the CompleteMultipartUpload request
         self.assertEqual(self.operations_called[3][1]['IfNoneMatch'], '*')
 
-    def test_mv_no_overwrite_flag_on_copy_when_object_exists_on_target(self):
+    def test_mv_no_overwrite_flag_on_copy_when_small_object_exists_on_target(
+        self,
+    ):
         cmdline = f'{self.prefix} s3://bucket1/key.txt s3://bucket2/key.txt --no-overwrite'
         # Set up responses for multipart copy (since no-overwrite always uses multipart)
         self.parsed_responses = [
@@ -506,6 +508,79 @@ class TestMvCommand(BaseS3TransferCommandTest):
         self.assertEqual(self.operations_called[0][0].name, 'HeadObject')
         self.assertEqual(self.operations_called[1][0].name, 'CopyObject')
         self.assertEqual(self.operations_called[2][0].name, 'DeleteObject')
+
+    def test_mv_no_overwrite_flag_when_large_object_exists_on_target(self):
+        cmdline = f'{self.prefix} s3://bucket1/key1.txt s3://bucket/key.txt --no-overwrite'
+        self.parsed_responses = [
+            self.head_object_response(ContentLength=10 * (1024**2)),
+            {'TagSet': []},  # GetObjectTagging response
+            {'UploadId': 'foo'},  # CreateMultipartUpload response
+            {
+                'CopyPartResult': {'ETag': '"foo-1"'}
+            },  # UploadPartCopy response part 1
+            {
+                'CopyPartResult': {'ETag': '"foo-2"'}
+            },  # UploadPartCopy response part 2
+            {
+                'ResponseMetadata': {'HTTPStatusCode': 412},
+                'Error': {
+                    'Code': 'PreconditionFailed',
+                    'Message': 'At least one of the pre-conditions you specified did not hold',
+                    'Condition': 'If-None-Match',
+                },
+            },  # CompleteMultipartUpload fails with PreconditionFailed
+            {},  # AbortMultipartUpload response
+        ]
+        self.run_cmd(cmdline, expected_rc=0)
+        # Verify all multipart operations were called
+        self.assertEqual(len(self.operations_called), 7)
+        self.assertEqual(self.operations_called[0][0].name, 'HeadObject')
+        self.assertEqual(self.operations_called[1][0].name, 'GetObjectTagging')
+        self.assertEqual(
+            self.operations_called[2][0].name, 'CreateMultipartUpload'
+        )
+        self.assertEqual(self.operations_called[3][0].name, 'UploadPartCopy')
+        self.assertEqual(self.operations_called[4][0].name, 'UploadPartCopy')
+        self.assertEqual(
+            self.operations_called[5][0].name, 'CompleteMultipartUpload'
+        )
+        self.assertEqual(
+            self.operations_called[6][0].name, 'AbortMultipartUpload'
+        )
+        # Verify the IfNoneMatch condition was set in the CompleteMultipartUpload request
+        self.assertEqual(self.operations_called[5][1]['IfNoneMatch'], '*')
+
+    def test_mv_no_overwrite_flag_when_large_object_does_not_exist_on_target(
+        self,
+    ):
+        cmdline = f'{self.prefix} s3://bucket1/key1.txt s3://bucket/key.txt --no-overwrite'
+        self.parsed_responses = [
+            self.head_object_response(ContentLength=10 * (1024**2)),
+            {'TagSet': []},  # GetObjectTagging response
+            {'UploadId': 'foo'},  # CreateMultipartUpload response
+            {
+                'CopyPartResult': {'ETag': '"foo-1"'}
+            },  # UploadPartCopy response part 1
+            {
+                'CopyPartResult': {'ETag': '"foo-2"'}
+            },  # UploadPartCopy response part 2
+            {},  # CompleteMultipartUpload response
+            self.delete_object_response(),  # DeleteObject (for move operation)
+        ]
+        self.run_cmd(cmdline, expected_rc=0)
+        # Verify all multipart operations were called
+        self.assertEqual(len(self.operations_called), 7)
+        self.assertEqual(self.operations_called[0][0].name, 'HeadObject')
+        self.assertEqual(self.operations_called[1][0].name, 'GetObjectTagging')
+        self.assertEqual(
+            self.operations_called[2][0].name, 'CreateMultipartUpload'
+        )
+        self.assertEqual(self.operations_called[3][0].name, 'UploadPartCopy')
+        self.assertEqual(self.operations_called[4][0].name, 'UploadPartCopy')
+        self.assertEqual(
+            self.operations_called[5][0].name, 'CompleteMultipartUpload'
+        )
+        self.assertEqual(self.operations_called[6][0].name, 'DeleteObject')
 
 
 class TestMvWithCRTClient(BaseCRTTransferClientTest):
