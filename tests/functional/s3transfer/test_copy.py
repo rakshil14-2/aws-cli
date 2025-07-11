@@ -12,6 +12,7 @@
 # language governing permissions and limitations under the License.
 from botocore.exceptions import ClientError
 from botocore.stub import Stubber
+from s3transfer.copies import CopySubmissionTask
 from s3transfer.manager import TransferConfig, TransferManager
 from s3transfer.utils import MIN_UPLOAD_CHUNKSIZE
 
@@ -275,7 +276,12 @@ class TestNonMultipartCopy(BaseCopyTest):
 
     def test_allowed_copy_params_are_valid(self):
         op_model = self.client.meta.service_model.operation_model('CopyObject')
-        for allowed_upload_arg in self._manager.ALLOWED_COPY_ARGS:
+        allowed_copy_arg = [
+            arg
+            for arg in self._manager.ALLOWED_COPY_ARGS
+            if arg not in CopySubmissionTask.COPY_OBJECT_BLOCKLIST
+        ]
+        for allowed_upload_arg in allowed_copy_arg:
             self.assertIn(allowed_upload_arg, op_model.input_shape.members)
 
     def test_copy_with_tagging(self):
