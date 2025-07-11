@@ -398,8 +398,9 @@ class TestCPCommand(BaseCPCommandTest):
         # Verify the IfNoneMatch condition was set in the CompleteMultipartUpload request
         self.assertEqual(self.operations_called[3][1]['IfNoneMatch'], '*')
 
-    def test_for_no_overwrite_flag_on_copy_when_object_does_not_exist_on_target(self):
-        """Testing no-overwrite flag when copy operation is initiated and object is not present at destination"""
+    def test_for_no_overwrite_flag_on_copy_when_small_object_does_not_exist_on_target(self):
+        """Testing no-overwrite flag when copy operation is initiated and
+        small object(less than multipart threshold) is not present at destination"""
         cmdline = f'{self.prefix} s3://bucket1/key.txt s3://bucket/key.txt --no-overwrite'
         # Set up responses for multipart copy (since no-overwrite always uses multipart)
         self.parsed_responses = [
@@ -418,8 +419,9 @@ class TestCPCommand(BaseCPCommandTest):
         # Verify the IfNoneMatch condition was set in the CompleteMultipartUpload request
         self.assertEqual(self.operations_called[3][1]['IfNoneMatch'], '*')
 
-    def test_for_no_overwrite_flag_on_copy_when_object_exists_on_target(self):
-        """Testing no-overwrite flag when copy operation is initiated and object is present at destination"""
+    def test_for_no_overwrite_flag_on_copy_when_small_object_exists_on_target(self):
+        """Testing no-overwrite flag when copy operation is initiated and
+        small object(less than multipart threshold) is present at destination"""
         cmdline = f'{self.prefix} s3://bucket1/key.txt s3://bucket/key.txt --no-overwrite'
         # Set up responses for multipart copy (since no-overwrite always uses multipart)
         self.parsed_responses = [
@@ -446,6 +448,58 @@ class TestCPCommand(BaseCPCommandTest):
         self.assertEqual(self.operations_called[4][0].name, 'AbortMultipartUpload')
         # Verify the IfNoneMatch condition was set in the CompleteMultipartUpload request
         self.assertEqual(self.operations_called[3][1]['IfNoneMatch'], '*')
+    
+    def test_for_no_overwrite_flag_on_copy_when_object_is_of_zero_size(self):
+        """Testing no-overwrite flag when copying a zero-sized object between S3 buckets"""
+        cmdline = f'{self.prefix} s3://bucket1/file.txt s3://bucket2/file.txt --no-overwrite'
+        self.parsed_responses = [
+            {
+                "ContentLength": 0,
+                "LastModified": "00:00:00Z",
+                'ETag': '"d41d8cd98f00b204e9800998ecf8427e"'
+            }, # HeadObject with content length 0
+            {'CopyObjectResult': {'ETag': '"d41d8cd98f00b204e9800998ecf8427e"'}}, # Copy Response
+        ]
+        self.run_cmd(cmdline, expected_rc=0)
+        self.assertEqual(len(self.operations_called), 2)
+        self.assertEqual(self.operations_called[0][0].name, 'HeadObject')
+        self.assertEqual(self.operations_called[1][0].name, 'CopyObject')
+
+    def test_for_no_overwrite_flag_on_copy_when_large_object_exists_on_target(self):
+        """Testing no-overwrite flag when copying a large object and object exists at destination"""
+        cmdline = f'{self.prefix} s3://bucket1/ob1.txt s3://bucket --no-overwrite'
+        # Set up responses for multipart copy with large object
+        self.parsed_responses = [
+            self.head_object_response(ContentLength=10 * (1024**2)),  # HeadObject to get source metadata
+            {'UploadId': 'foo'},  # CreateMultipartUpload response
+            {'CopyPartResult': {'ETag': '"foo-1"'}},  # UploadPartCopy response part 1
+            {'CopyPartResult': {'ETag': '"foo-2"'}},  # UploadPartCopy response part 2
+            {
+                'ResponseMetadata': {'HTTPStatusCode': 412},
+                'Error': {
+                    'Code': 'PreconditionFailed',
+                    'Message': 'At least one of the pre-conditions you specified did not hold',
+                    'Condition': 'If-None-Match'
+                }
+            },  # CompleteMultipartUpload fails with PreconditionFailed
+            {}  # AbortMultipartUpload response
+        ]
+         # Set the HTTP status codes for each response
+        self.set_http_status_codes([200, 200, 200, 200, 412, 200])
+  
+        self.run_cmd(cmdline, expected_rc=0)
+        # Verify all multipart operations were called
+        print("Operations %s",self.operations_called)
+        self.assertEqual(len(self.operations_called), 6)
+        self.assertEqual(self.operations_called[0][0].name, 'HeadObject')
+        self.assertEqual(self.operations_called[1][0].name, 'CreateMultipartUpload')
+        self.assertEqual(self.operations_called[2][0].name, 'UploadPartCopy')
+        self.assertEqual(self.operations_called[3][0].name, 'UploadPartCopy')
+        self.assertEqual(self.operations_called[4][0].name, 'CompleteMultipartUpload')
+        self.assertEqual(self.operations_called[5][0].name, 'AbortMultipartUpload')
+        # Verify the IfNoneMatch condition was set in the CompleteMultipartUpload request
+        self.assertEqual(self.operations_called[4][1]['IfNoneMatch'], '*')
+
 
     def test_dryrun_download(self):
         self.parsed_responses = [self.head_object_response()]

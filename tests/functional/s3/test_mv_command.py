@@ -476,6 +476,24 @@ class TestMvCommand(BaseS3TransferCommandTest):
         # Verify the IfNoneMatch condition was set in the CompleteMultipartUpload request
         self.assertEqual(self.operations_called[3][1]['IfNoneMatch'], '*')
     
+    def test_mv_no_overwrite_flag_on_copy_when_object_is_of_zero_size(self):
+        """Testing mv command no-overwrite flag when copying a zero-sized object between S3 buckets"""
+        cmdline = f'{self.prefix} s3://bucket1/file.txt s3://bucket2/file.txt --no-overwrite'
+        self.parsed_responses = [
+            {
+                "ContentLength": 0,
+                "LastModified": "00:00:00Z",
+                'ETag': '"d41d8cd98f00b204e9800998ecf8427e"'
+            }, # HeadObject with content length 0
+            {'CopyObjectResult': {'ETag': '"d41d8cd98f00b204e9800998ecf8427e"'}}, # Copy Response
+            self.delete_object_response(), # DeleteObject (for move operation)
+        ]
+        self.run_cmd(cmdline, expected_rc=0)
+        self.assertEqual(len(self.operations_called), 3)
+        self.assertEqual(self.operations_called[0][0].name, 'HeadObject')
+        self.assertEqual(self.operations_called[1][0].name, 'CopyObject')
+        self.assertEqual(self.operations_called[2][0].name, 'DeleteObject')
+
 class TestMvWithCRTClient(BaseCRTTransferClientTest):
     def test_upload_move_using_crt_client(self):
         filename = self.files.create_file('myfile', 'mycontent')
