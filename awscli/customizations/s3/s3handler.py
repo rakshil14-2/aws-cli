@@ -425,6 +425,16 @@ class DownloadRequestSubmitter(BaseTransferRequestSubmitter):
     def _submit_transfer_request(self, fileinfo, extra_args, subscribers):
         bucket, key = find_bucket_key(fileinfo.src)
         fileout = self._get_fileout(fileinfo)
+        if self._cli_params.get('no_overwrite') and os.path.exists(fileout):
+            # Skip download if --no-overwrite flag is set to true and
+            # the file is already present at the destination.
+            # This prevents overwriting existing local files during S3 download operations.
+            LOGGER.debug(
+                "Warning: Skipping file %s as it already exists on %s",
+                fileinfo.src,
+                fileinfo.dest,
+            )
+            return
         return self._transfer_manager.download(
             fileobj=fileout,
             bucket=bucket,
