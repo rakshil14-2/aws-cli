@@ -684,6 +684,7 @@ TRANSFER_ARGS = [
     REQUEST_PAYER,
     CHECKSUM_MODE,
     CHECKSUM_ALGORITHM,
+    NO_OVERWRITE,
 ]
 
 
@@ -1072,7 +1073,6 @@ class CpCommand(S3TransferCommand):
             METADATA_DIRECTIVE,
             EXPECTED_SIZE,
             RECURSIVE,
-            NO_OVERWRITE,
         ]
     )
 
@@ -1097,7 +1097,6 @@ class MvCommand(S3TransferCommand):
             METADATA_DIRECTIVE,
             RECURSIVE,
             VALIDATE_SAME_S3_PATHS,
-            NO_OVERWRITE,
         ]
     )
 
@@ -1401,7 +1400,8 @@ class CommandArchitecture:
             self._client, self._source_client, self.parameters
         )
 
-        s3_transfer_handler = S3TransferHandlerFactory(self.parameters)(
+        params = self._get_s3_handler_params()
+        s3_transfer_handler = S3TransferHandlerFactory(params)(
             self._transfer_manager, result_queue
         )
 
@@ -1509,6 +1509,15 @@ class CommandArchitecture:
                     'sse_c_key': self.parameters.get('sse_c_copy_source_key'),
                 },
             )
+
+    def _get_s3_handler_params(self):
+        """Removing no-overwrite params from sync
+        since file to be synced are already separated out using sync strategy"""
+        if self.cmd == 'sync':
+            return {
+                k: v for k, v in self.parameters.items() if k != 'no_overwrite'
+            }
+        return self.parameters
 
 
 # TODO: This class is fairly quirky in the sense that it is both a builder
