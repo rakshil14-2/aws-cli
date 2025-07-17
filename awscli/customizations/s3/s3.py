@@ -22,6 +22,7 @@ from awscli.customizations.s3.subcommands import (
     RmCommand,
     SyncCommand,
     WebsiteCommand,
+    ListVersionsCommand
 )
 from awscli.customizations.s3.syncstrategy.register import (
     register_sync_strategies,
@@ -70,6 +71,7 @@ class S3(BasicCommand):
         {'name': 'mb', 'command_class': MbCommand},
         {'name': 'rb', 'command_class': RbCommand},
         {'name': 'presign', 'command_class': PresignCommand},
+        {'name': 'list-versions', 'command_class': ListVersionsCommand},
     ]
 
     def _run_main(self, parsed_args, parsed_globals):

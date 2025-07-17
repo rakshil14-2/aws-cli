@@ -15,6 +15,8 @@ import logging
 import re
 import threading
 
+from awscli.s3transfer.delete import BatchDeleteSubmissionTask
+
 from botocore.useragent import register_feature_id
 from s3transfer.bandwidth import BandwidthLimiter, LeakyBucket
 from s3transfer.constants import (
@@ -641,6 +643,7 @@ class TransferManager:
             transfers.
         """
         self._shutdown(cancel, cancel, cancel_msg)
+        
 
     def _shutdown(self, cancel, cancel_msg, exc_type=CancelledError):
         if cancel:
@@ -666,6 +669,22 @@ class TransferManager:
             self._request_executor.shutdown()
             self._io_executor.shutdown()
 
+    def batch_delete(self, bucket, objects, extra_args=None, subscribers=None):
+        """Delete multiple S3 objects in batches"""
+        if extra_args is None:
+            extra_args = {}
+        if subscribers is None:
+            subscribers = []
+        allowed_delete_objects_args = self.ALLOWED_DOWNLOAD_ARGS+['Quiet']
+        self._validate_all_known_args(extra_args, allowed_delete_objects_args)
+        self._validate_if_bucket_supported(bucket)
+        call_args = CallArgs(
+            bucket=bucket,
+            objects=objects,
+            extra_args=extra_args,
+            subscribers=subscribers,
+        )
+        return self._submit_transfer(call_args, BatchDeleteSubmissionTask)
 
 class TransferCoordinatorController:
     def __init__(self):

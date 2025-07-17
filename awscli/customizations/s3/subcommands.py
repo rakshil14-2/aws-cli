@@ -30,7 +30,7 @@ from awscli.customizations.s3.factory import (
     TransferManagerFactory,
 )
 from awscli.customizations.s3.fileformat import FileFormat
-from awscli.customizations.s3.filegenerator import FileGenerator
+from awscli.customizations.s3.filegenerator import FileGenerator, VersionedFileGenerator
 from awscli.customizations.s3.fileinfo import FileInfo
 from awscli.customizations.s3.fileinfobuilder import FileInfoBuilder
 from awscli.customizations.s3.filters import create_filter
@@ -651,6 +651,15 @@ NO_OVERWRITE = {
     ),
 }
 
+ALL_VERSION = {
+    'name': 'all-version',
+    'action': 'store_true',
+    'help_text': (
+        "Deletes all versions of the specified objects. If a bucket is specified, "
+        "all versions of all objects in the bucket will be deleted."
+    ),
+}
+
 TRANSFER_ARGS = [
     DRYRUN,
     QUIET,
@@ -1120,6 +1129,7 @@ class RmCommand(S3TransferCommand):
         EXCLUDE,
         ONLY_SHOW_ERRORS,
         PAGE_SIZE,
+        ALL_VERSION,
     ]
 
 
@@ -1237,6 +1247,101 @@ class RbCommand(S3Command):
                 "remove_bucket failed: Unable to delete all objects in the "
                 "bucket, bucket will not be deleted."
             )
+class ListVersionsCommand(S3Command):
+    NAME = 'list-versions'
+    DESCRIPTION = (
+        "List all versions of S3 objects under a prefix or "
+        "all versions of a specific S3 object."
+    )
+    USAGE = "<S3Uri>"
+    ARG_TABLE = [
+        {
+            'name': 'paths',
+            'nargs': 1,
+            'positional_arg': True,
+            'synopsis': USAGE,
+        },
+        PAGE_SIZE,
+        HUMAN_READABLE,
+        REQUEST_PAYER,
+    ]
+
+    def _run_main(self, parsed_args, parsed_globals):
+        super(ListVersionsCommand, self)._run_main(parsed_args, parsed_globals)
+        
+        # Get the S3 path
+        s3_path = parsed_args.paths[0]
+        if not s3_path.startswith('s3://'):
+            raise ParamValidationError("Invalid S3 path: %s" % s3_path)
+        
+        # Create a client
+        params = {
+            'region': parsed_globals.region,
+            'endpoint_url': parsed_globals.endpoint_url,
+            'verify_ssl': parsed_globals.verify_ssl,
+        }
+        client = ClientFactory(self._session).create_client(params)
+        
+        # Create request parameters
+        request_params = {}
+        if parsed_args.request_payer:
+            request_params['ListObjectVersions'] = {
+                'RequestPayer': parsed_args.request_payer
+            }
+        
+        # Create a VersionedFileGenerator
+        version_generator = VersionedFileGenerator(
+            client=client,
+            operation_name='list',  # Just listing, not deleting
+            page_size=parsed_args.page_size,
+            request_parameters=request_params
+        )
+        
+        # Create a files dictionary for the generator
+        files = {
+            'src': {'path': s3_path, 'type': 's3'},
+            'dest': {'path': s3_path, 'type': 's3'},  # Destination doesn't matter for listing
+            'dir_op': True,  # Always list all versions
+            'use_src_name': True,
+        }
+        
+        # Print header
+        print("Versions for %s:" % s3_path)
+        print("%-20s %-36s %-12s %-20s %s" % (
+            "LastModified", "VersionId", "Size", "DeleteMarker", "Key"
+        ))
+        print("-" * 100)
+        
+        # List all versions using the VersionedFileGenerator
+        total_versions = 0
+        for fileinfo in version_generator.call(files):
+            # Format the output
+            last_mod = fileinfo.last_update.strftime("%Y-%m-%d %H:%M:%S")
+            
+            # Format the size
+            if parsed_args.human_readable:
+                size_str = human_readable_size(fileinfo.size)
+            else:
+                size_str = str(fileinfo.size)
+            
+            # Check if this is a delete marker
+            delete_marker = "Yes" if fileinfo.is_delete_marker else "No"
+            
+            # Extract the key from the source path
+            _, key = split_s3_bucket_key(fileinfo.src)
+            
+            # Print the version information
+            print("%-20s %-36s %-12s %-20s %s" % (
+                last_mod, fileinfo.version_id, size_str, delete_marker, key
+            ))
+            
+            total_versions += 1
+        
+        # Print summary
+        print("\nTotal Versions: %d" % total_versions)
+        
+        return 0
+
 
 
 class CommandArchitecture:
@@ -1275,14 +1380,28 @@ class CommandArchitecture:
         instruction list because it sends the request to S3 and does not
         yield anything.
         """
-        if self.needs_filegenerator():
-            self.instructions.append('file_generator')
+        # if self.needs_filegenerator():
+        #     self.instructions.append('file_generator')
+        #     if self.parameters.get('filters'):
+        #         self.instructions.append('filters')
+        #     if self.cmd == 'sync':
+        #         self.instructions.append('comparator')
+        #     self.instructions.append('file_info_builder')
+        # self.instructions.append('s3_handler')
+        if self.cmd == 'rm' and self.parameters.get('all_version'):
+            self.instructions.append('versioned_file_generator')
             if self.parameters.get('filters'):
                 self.instructions.append('filters')
-            if self.cmd == 'sync':
-                self.instructions.append('comparator')
-            self.instructions.append('file_info_builder')
-        self.instructions.append('s3_handler')
+            self.instructions.append('s3_handler')
+        else:
+            if self.needs_filegenerator():
+                self.instructions.append('file_generator')
+                if self.parameters.get('filters'):
+                    self.instructions.append('filters')
+                if self.cmd == 'sync':
+                    self.instructions.append('comparator')
+                self.instructions.append('file_info_builder')
+            self.instructions.append('s3_handler')
 
     def needs_filegenerator(self):
         return not self.parameters['is_stream']
@@ -1383,6 +1502,10 @@ class CommandArchitecture:
 
         file_generator = FileGenerator(**fgen_kwargs)
         rev_generator = FileGenerator(**rgen_kwargs)
+        versioned_file_generator = None
+        if self.parameters.get('all_version'):
+            versioned_file_generator = VersionedFileGenerator(**fgen_kwargs)
+
         stream_dest_path, stream_compare_key = find_dest_path_comp_key(files)
         stream_file_info = [
             FileInfo(
@@ -1434,13 +1557,28 @@ class CommandArchitecture:
                 's3_handler': [s3_transfer_handler],
             }
         elif self.cmd == 'rm':
-            command_dict = {
-                'setup': [files],
-                'file_generator': [file_generator],
-                'filters': [create_filter(self.parameters)],
-                'file_info_builder': [file_info_builder],
-                's3_handler': [s3_transfer_handler],
-            }
+            if self.parameters.get('all_version'):
+                command_dict = {
+                    'setup': [files],
+                    'versioned_file_generator': [versioned_file_generator],
+                    'filters': [create_filter(self.parameters)],
+                    's3_handler': [s3_transfer_handler],
+                }
+            else:
+                command_dict = {
+                    'setup': [files],
+                    'file_generator': [file_generator],
+                    'filters': [create_filter(self.parameters)],
+                    'file_info_builder': [file_info_builder],
+                    's3_handler': [s3_transfer_handler],
+                }
+            # command_dict = {
+            #     'setup': [files],
+            #     'file_generator': [file_generator],
+            #     'filters': [create_filter(self.parameters)],
+            #     'file_info_builder': [file_info_builder],
+            #     's3_handler': [s3_transfer_handler],
+            # }
         elif self.cmd == 'mv':
             command_dict = {
                 'setup': [files],

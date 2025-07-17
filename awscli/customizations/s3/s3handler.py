@@ -54,7 +54,9 @@ from awscli.customizations.s3.utils import (
     find_bucket_key,
     human_readable_size,
     relative_path,
+    split_s3_bucket_key,
 )
+from awscli.s3transfer.constants import MAX_BATCH_SIZE
 
 LOGGER = logging.getLogger(__name__)
 
@@ -89,7 +91,11 @@ class S3TransferHandlerFactory:
         command_result_recorder = CommandResultRecorder(
             result_queue, result_recorder, result_processor
         )
-
+        # If all_version is specified, use BatchDeleteHandler for rm command
+        if self._cli_params.get('all_version'):
+            return BatchDeleteHandler(
+                transfer_manager, self._cli_params, command_result_recorder
+            )
         return S3TransferHandler(
             transfer_manager, self._cli_params, command_result_recorder
         )
@@ -124,6 +130,7 @@ class S3TransferHandler:
             used to get the final result of the transfer
         """
         self._transfer_manager = transfer_manager
+        self._cli_params = cli_params
         # TODO: Ideally the s3 transfer handler should not need to know
         # about the result command recorder. It really only needs an interface
         # for adding results to the queue. When all of the commands have
@@ -602,3 +609,145 @@ class LocalDeleteRequestSubmitter(BaseTransferRequestSubmitter):
 
     def _format_src_dest(self, fileinfo):
         return self._format_local_path(fileinfo.src), None
+
+class BatchDeleteHandler(S3TransferHandler):
+    """
+    Handler for batch deletion of S3 object versions.
+    
+    This handler collects all objects and passes them to the transfer manager's
+    batch_delete method, which handles the batching.
+    """
+    
+    def __init__(self, transfer_manager, cli_params, result_command_recorder):
+        """
+        Initialize a new BatchDeleteHandler.
+        
+        :param transfer_manager: The transfer manager to use.
+        :param cli_params: The CLI parameters.
+        :param result_command_recorder: The result command recorder.
+        """
+        super().__init__(
+            transfer_manager, cli_params, result_command_recorder
+        )
+        self._objects_by_bucket = {}  # Dictionary of bucket -> list of objects
+    
+    def call(self, fileinfos):
+        """
+        Process the file infos and delete objects.
+        
+        :param fileinfos: An iterable of FileInfo objects.
+        :return: The result of the command.
+        """
+        with self._result_command_recorder:
+            with self._transfer_manager:
+                total_submissions = 0
+                
+                # Collect all objects by bucket
+                for fileinfo in fileinfos:
+                    # Extract bucket and key
+                    bucket, key = split_s3_bucket_key(fileinfo.src)
+                    
+                    # Initialize the list for this bucket if it doesn't exist
+                    if bucket not in self._objects_by_bucket:
+                        self._objects_by_bucket[bucket] = []
+                    
+                    # Add this object to the list
+                    obj_entry = {'Key': key}
+                    # Only add VersionId if it exists and is not None
+                    if hasattr(fileinfo, 'version_id') and fileinfo.version_id:
+                        obj_entry['VersionId'] = fileinfo.version_id
+                    
+                    self._objects_by_bucket[bucket].append(obj_entry)
+                    total_submissions += 1
+                
+                # Process all buckets
+                for bucket, objects in self._objects_by_bucket.items():
+                    if objects:
+                        # Process objects in batches of 1000 (S3 API limit)
+                        for i in range(0, len(objects), MAX_BATCH_SIZE):
+                            batch = objects[i:i + MAX_BATCH_SIZE]
+                            self._delete_objects(bucket, batch)
+                
+                self._result_command_recorder.notify_total_submissions(
+                    total_submissions
+                )
+        
+        return self._result_command_recorder.get_command_result()
+    
+    def _delete_objects(self, bucket, objects):
+        """
+        Delete all objects in the specified bucket.
+        
+        :param bucket: The bucket containing the objects.
+        :param objects: The list of objects to delete.
+        """
+        # If this is a dry run, just report what would be deleted
+        if self._cli_params.get('dryrun', False):
+            self._report_dryrun(bucket, objects)
+        else:
+            # Delete the objects using the transfer manager's batch_delete method
+            try:
+                # Prepare extra_args
+                extra_args = {'Quiet': self._cli_params.get('quiet', False)}
+                if self._cli_params.get('request_payer'):
+                    extra_args['RequestPayer'] = self._cli_params['request_payer']
+                
+                # Use the transfer manager's batch_delete method
+                future = self._transfer_manager.batch_delete(
+                    bucket=bucket,
+                    objects=objects,
+                    extra_args=extra_args,
+                )
+                # Wait for the future to complete
+                future.result()
+                
+                # Since we're using the Quiet mode, we won't get detailed responses
+                # Just report success for all objects
+                for obj in objects:
+                    self._report_success(bucket, obj)
+                
+            except Exception as e:
+                # If the entire request fails, report an error for each object
+                for obj in objects:
+                    self._report_batch_error(bucket, obj, e)
+    
+    def _report_dryrun(self, bucket, objects):
+        """
+        Report what would be deleted in dry run mode.
+        """
+        for obj in objects:
+            version_str = f" (version {obj.get('VersionId', '')})" if obj.get('VersionId') else ""
+            self._result_command_recorder.result_queue.put(
+                DryRunResult(
+                    transfer_type='delete',
+                    src=f"s3://{bucket}/{obj['Key']}{version_str}",
+                    dest=None
+                )
+            )
+    
+    def _report_success(self, bucket, obj):
+        """
+        Report a successful deletion.
+        """
+        version_str = f" (version {obj.get('VersionId', '')})" if obj.get('VersionId') else ""
+        self._result_command_recorder.result_queue.put(
+            SuccessResult(
+                transfer_type='delete',
+                src=f"s3://{bucket}/{obj['Key']}{version_str}",
+                dest=None
+            )
+        )
+    
+    def _report_batch_error(self, bucket, obj, exception):
+        """
+        Report an error for an object when the entire request fails.
+        """
+        version_str = f" (version {obj.get('VersionId', '')})" if obj.get('VersionId') else ""
+        self._result_command_recorder.result_queue.put(
+            FailureResult(
+                transfer_type='delete',
+                src=f"s3://{bucket}/{obj['Key']}{version_str}",
+                dest=None,
+                exception=exception
+            )
+        )
