@@ -22,6 +22,7 @@ from awscli.compat import queue
 from awscli.customizations.s3.utils import (
     EPOCH_TIME,
     BucketLister,
+    BucketVersionLister,
     create_warning,
     find_bucket_key,
     find_dest_path_comp_key,
@@ -406,3 +407,49 @@ class FileGenerator:
         response['LastModified'] = last_update.astimezone(tzlocal())
         response['ETag'] = response.pop('ETag', None)
         return s3_path, response
+
+
+class VersionFileGenerator:
+    """
+    This class generates VersionedFileInfo objects for all versions of objects in a bucket.
+    It uses the BucketVersionLister to list all the versions and creates appropriate VersionedFileInfo
+    objects for each version.
+    """
+
+    def __init__(
+        self,
+        client,
+        operation_name,
+        follow_symlinks=True,
+        page_size=None,
+        result_queue=None,
+        request_parameters=None,
+    ):
+        """
+        Initialize a new VersionedFileGenerator.
+
+        :param client: The S3 client to use.
+        :param operation_name: The name of the operation to perform.
+        :param follow_symlinks: Whether to follow symlinks.
+        :param page_size: The number of items to include in each API response.
+        :param result_queue: Queue for results and warnings.
+        :param request_parameters: Additional parameters for the request.
+        """
+        self._client = client
+        self.operation_name = operation_name
+        self.follow_symlinks = follow_symlinks
+        self.page_size = page_size
+        self.result_queue = result_queue
+        if not result_queue:
+            self.result_queue = queue.Queue()
+        self.request_parameters = {}
+        if request_parameters is not None:
+            self.request_parameters = request_parameters
+        self._version_lister = BucketVersionLister(client)
+
+    def call(self, files):
+        """
+        Generate VersionedFileInfo objects for all versions of objects.
+
+        :param files: Dictionary containing
+        """
