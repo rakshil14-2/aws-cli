@@ -57,6 +57,7 @@ SuccessResult = _create_new_result_cls('SuccessResult')
 FailureResult = _create_new_result_cls('FailureResult', ['exception'])
 
 DryRunResult = _create_new_result_cls('DryRunResult')
+SkippedResult = _create_new_result_cls('SkippedResult')
 
 ErrorResult = namedtuple('ErrorResult', ['exception'])
 
@@ -132,6 +133,13 @@ class DoneResultSubscriber(BaseResultSubscriber, OnDoneFilteredSubscriber):
                 self._src,
                 self._dest,
             )
+            self._result_queue.put(
+                SkippedResult(
+                    transfer_type=self._transfer_type,
+                    src=self._src,
+                    dest=self._dest,
+                )
+            )
         else:
             self._result_queue.put(
                 FailureResult(
@@ -187,6 +195,7 @@ class ResultRecorder(BaseResultHandler):
             ErrorResult: self._record_error_result,
             CtrlCResult: self._record_error_result,
             FinalTotalSubmissionsResult: self._record_final_expected_files,
+            SkippedResult: self._record_skipped_result,
         }
 
     def expected_totals_are_final(self):
@@ -282,6 +291,10 @@ class ResultRecorder(BaseResultHandler):
                 self.expected_bytes_transferred += result.bytes_transferred
 
     def _record_success_result(self, result, **kwargs):
+        self._pop_result_from_ongoing_dicts(result)
+        self.files_transferred += 1
+
+    def _record_skipped_result(self, result, **kwargs):
         self._pop_result_from_ongoing_dicts(result)
         self.files_transferred += 1
 
@@ -518,9 +531,7 @@ class ResultPrinter(BaseResultHandler):
 
     def _clear_progress_if_no_more_expected_transfers(self, **kwargs):
         if self._progress_length and not self._has_remaining_progress():
-            uni_print(
-                '\r' + self._adjust_statement_padding(''), self._out_file
-            )
+            uni_print(self._adjust_statement_padding(''), self._out_file)
 
 
 class NoProgressResultPrinter(ResultPrinter):

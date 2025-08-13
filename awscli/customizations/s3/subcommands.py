@@ -1072,6 +1072,7 @@ class CpCommand(S3TransferCommand):
             METADATA_DIRECTIVE,
             EXPECTED_SIZE,
             RECURSIVE,
+            NO_OVERWRITE,
         ]
     )
 
