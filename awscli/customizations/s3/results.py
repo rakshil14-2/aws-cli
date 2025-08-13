@@ -129,9 +129,7 @@ class DoneResultSubscriber(BaseResultSubscriber, OnDoneFilteredSubscriber):
             self._result_queue.put(error_result_cls(exception=e))
         elif self._is_precondition_failed(e):
             LOGGER.debug(
-                "Warning: Skipping file %s as it already exists on %s",
-                self._src,
-                self._dest,
+                f"warning: skipping {self._src} -> {self._src}, file exists at destination"
             )
             self._result_queue.put(
                 SkippedResult(
@@ -375,6 +373,7 @@ class ResultPrinter(BaseResultHandler):
             ErrorResult: self._print_error,
             CtrlCResult: self._print_ctrl_c,
             DryRunResult: self._print_dry_run,
+            SkippedResult: self._print_skipped,
             FinalTotalSubmissionsResult: self._clear_progress_if_no_more_expected_transfers,
         }
 
@@ -403,6 +402,9 @@ class ResultPrinter(BaseResultHandler):
         )
         success_statement = self._adjust_statement_padding(success_statement)
         self._print_to_out_file(success_statement)
+        self._redisplay_progress()
+
+    def _print_skipped(self, result, **kwargs):
         self._redisplay_progress()
 
     def _print_failure(self, result, **kwargs):
@@ -517,10 +519,14 @@ class ResultPrinter(BaseResultHandler):
         return print_statement + ending_char
 
     def _has_remaining_progress(self):
+        LOGGER.debug("Expected %s",self._result_recorder.expected_totals_are_final())
         if not self._result_recorder.expected_totals_are_final():
             return True
+        LOGGER.debug("===================")
         actual = self._result_recorder.files_transferred
         expected = self._result_recorder.expected_files_transferred
+        LOGGER.debug("Actual: %s", actual)
+        LOGGER.debug("Expected: %s", expected)
         return actual != expected
 
     def _print_to_out_file(self, statement):
