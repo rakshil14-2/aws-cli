@@ -30,6 +30,7 @@ from awscli.customizations.s3.results import (
     ResultPrinter,
     ResultProcessor,
     ResultRecorder,
+    SkippedResult,
     SuccessResult,
 )
 from awscli.customizations.s3.subscribers import (
@@ -462,10 +463,17 @@ class DownloadRequestSubmitter(BaseTransferRequestSubmitter):
         if not self._cli_params.get('no_overwrite'):
             return False
         fileout = self._get_fileout(fileinfo)
+
         if os.path.exists(fileout):
             LOGGER.debug(
                 f"warning: skipping {fileinfo.src} -> {fileinfo.dest}, file exists at destination"
             )
+            result_kwargs = {
+                'transfer_type': 'download',
+                'src': fileinfo.src,
+                'dest': fileinfo.dest,
+            }
+            self._result_queue.put(SkippedResult(**result_kwargs))
             return True
         return False
 
@@ -543,6 +551,12 @@ class CopyRequestSubmitter(BaseTransferRequestSubmitter):
             LOGGER.debug(
                 f"warning: skipping {fileinfo.src} -> {fileinfo.dest}, file exists at destination"
             )
+            result_kwargs = {
+                'transfer_type': 'copy',
+                'src': fileinfo.src,
+                'dest': fileinfo.dest,
+            }
+            self._result_queue.put(SkippedResult(**result_kwargs))
             return True
         except ClientError as e:
             if e.response['Error']['Code'] == '404':
