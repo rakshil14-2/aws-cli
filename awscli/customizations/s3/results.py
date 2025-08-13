@@ -530,7 +530,10 @@ class ResultPrinter(BaseResultHandler):
 
     def _clear_progress_if_no_more_expected_transfers(self, **kwargs):
         if self._progress_length and not self._has_remaining_progress():
-            uni_print(self._adjust_statement_padding(''), self._out_file)
+            # Clear the progress line with carriage return + spaces + newline
+            clear_statement = '\r' + ' ' * self._progress_length + '\n'
+            uni_print(clear_statement, self._out_file)
+            self._progress_length = 0
 
 
 class NoProgressResultPrinter(ResultPrinter):
