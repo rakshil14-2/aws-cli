@@ -58,6 +58,8 @@ FailureResult = _create_new_result_cls('FailureResult', ['exception'])
 
 DryRunResult = _create_new_result_cls('DryRunResult')
 
+SkippedResult = _create_new_result_cls('SkippedResult')
+
 ErrorResult = namedtuple('ErrorResult', ['exception'])
 
 CtrlCResult = _create_new_result_cls('CtrlCResult', base_cls=ErrorResult)
@@ -132,6 +134,13 @@ class DoneResultSubscriber(BaseResultSubscriber, OnDoneFilteredSubscriber):
                 self._src,
                 self._dest,
             )
+            self._result_queue.put(
+                SkippedResult(
+                    transfer_type=self._transfer_type,
+                    src=self._src,
+                    dest=self._dest,
+                )
+            )
         else:
             self._result_queue.put(
                 FailureResult(
@@ -183,6 +192,7 @@ class ResultRecorder(BaseResultHandler):
             ProgressResult: self._record_progress_result,
             SuccessResult: self._record_success_result,
             FailureResult: self._record_failure_result,
+            SkippedResult: self._record_skipped_result,
             WarningResult: self._record_warning_result,
             ErrorResult: self._record_error_result,
             CtrlCResult: self._record_error_result,
@@ -282,6 +292,10 @@ class ResultRecorder(BaseResultHandler):
                 self.expected_bytes_transferred += result.bytes_transferred
 
     def _record_success_result(self, result, **kwargs):
+        self._pop_result_from_ongoing_dicts(result)
+        self.files_transferred += 1
+
+    def _record_skipped_result(self, result, **kwargs):
         self._pop_result_from_ongoing_dicts(result)
         self.files_transferred += 1
 
