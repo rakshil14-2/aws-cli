@@ -520,7 +520,7 @@ class ResultPrinter(BaseResultHandler):
 
     def _has_remaining_progress(self):
         LOGGER.debug(
-            "Expected %s", self._result_recorder.expected_totals_are_final()
+            "Expected Value %s", self._result_recorder.expected_totals_are_final()
         )
         if not self._result_recorder.expected_totals_are_final():
             return True
@@ -540,7 +540,6 @@ class ResultPrinter(BaseResultHandler):
     def _clear_progress_if_no_more_expected_transfers(self, **kwargs):
         if self._progress_length and not self._has_remaining_progress():
             uni_print(self._adjust_statement_padding(''), self._out_file)
-            self._out_file.flush()  # Ensure output is flushed
 
 
 class NoProgressResultPrinter(ResultPrinter):
