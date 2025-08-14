@@ -294,13 +294,16 @@ class ResultRecorder(BaseResultHandler):
         self.files_transferred += 1
 
     def _record_skipped_result(self, result, **kwargs):
-        self._pop_result_from_ongoing_dicts(result)
+        # self._pop_result_from_ongoing_dicts(result)
+        LOGGER.debug("I am here in skipped Result")
+        LOGGER.debug("========")
         self.files_transferred += 1
 
     def _record_failure_result(self, result, **kwargs):
         # If there was a failure, we want to account for the failure in
         # the count for bytes transferred by just adding on the remaining bytes
         # that did not get transferred.
+        LOGGER.debug("I am here in failure")
         total_progress, total_file_size = self._pop_result_from_ongoing_dicts(
             result
         )
@@ -530,10 +533,7 @@ class ResultPrinter(BaseResultHandler):
 
     def _clear_progress_if_no_more_expected_transfers(self, **kwargs):
         if self._progress_length and not self._has_remaining_progress():
-            # Clear the progress line with carriage return + spaces + newline
-            clear_statement = '\r' + ' ' * self._progress_length + '\n'
-            uni_print(clear_statement, self._out_file)
-            self._progress_length = 0
+            uni_print(self._adjust_statement_padding(''), self._out_file)
 
 
 class NoProgressResultPrinter(ResultPrinter):

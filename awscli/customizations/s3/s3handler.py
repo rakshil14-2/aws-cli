@@ -473,7 +473,9 @@ class DownloadRequestSubmitter(BaseTransferRequestSubmitter):
                 'src': fileinfo.src,
                 'dest': fileinfo.dest,
             }
-            self._result_queue.put(QueuedResult(total_transfer_size=fileinfo.size or 0, **result_kwargs))
+            self._result_queue.put(
+                QueuedResult(total_transfer_size=0, **result_kwargs)
+            )
             self._result_queue.put(SkippedResult(**result_kwargs))
             return True
         return False
@@ -557,7 +559,9 @@ class CopyRequestSubmitter(BaseTransferRequestSubmitter):
                 'src': fileinfo.src,
                 'dest': fileinfo.dest,
             }
-            self._result_queue.put(QueuedResult(total_transfer_size=0, **result_kwargs))
+            self._result_queue.put(
+                QueuedResult(total_transfer_size=0, **result_kwargs)
+            )
             self._result_queue.put(SkippedResult(**result_kwargs))
             return True
         except ClientError as e:
