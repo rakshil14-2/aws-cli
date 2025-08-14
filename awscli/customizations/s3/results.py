@@ -174,6 +174,7 @@ class ResultRecorder(BaseResultHandler):
         self.files_transferred = 0
         self.files_failed = 0
         self.files_warned = 0
+        self.files_skipped = 0
         self.errors = 0
         self.expected_bytes_transferred = 0
         self.expected_files_transferred = 0
@@ -198,6 +199,8 @@ class ResultRecorder(BaseResultHandler):
         }
 
     def expected_totals_are_final(self):
+        LOGGER.debug("Final Expected %s",self.final_expected_files_transferred)
+        LOGGER.debug("Expected %s", self.expected_files_transferred)
         return (
             self.final_expected_files_transferred
             == self.expected_files_transferred
@@ -290,19 +293,20 @@ class ResultRecorder(BaseResultHandler):
                 self.expected_bytes_transferred += result.bytes_transferred
 
     def _record_success_result(self, result, **kwargs):
-        self._pop_result_from_ongoing_dicts(result)
+        progress_info = self._pop_result_from_ongoing_dicts(result)
         LOGGER.debug("I am here in success Result")
         LOGGER.debug("========")
-        LOGGER.debug("Progress %s",self._pop_result_from_ongoing_dicts(result))
+        LOGGER.debug("Progress %s", progress_info)
         self.files_transferred += 1
 
     def _record_skipped_result(self, result, **kwargs):
         # Clean up ongoing progress tracking for skipped files
-        self._pop_result_from_ongoing_dicts(result)
+        progress_info = self._pop_result_from_ongoing_dicts(result)
         LOGGER.debug("I am here in skipped Result")
         LOGGER.debug("========")
-        LOGGER.debug("Progress %s",self._pop_result_from_ongoing_dicts(result))
+        LOGGER.debug("Progress %s", progress_info)
         self.files_transferred += 1
+        self.files_skipped += 1
 
     def _record_failure_result(self, result, **kwargs):
         # If there was a failure, we want to account for the failure in
@@ -325,6 +329,8 @@ class ResultRecorder(BaseResultHandler):
         self.errors += 1
 
     def _record_final_expected_files(self, result, **kwargs):
+        LOGGER.debug("Total submission %s",result.total_submissions)
+        # LOGGER.debug("Expected files %s", self.files_skipped)
         self.final_expected_files_transferred = result.total_submissions
 
 
@@ -466,7 +472,7 @@ class ResultPrinter(BaseResultHandler):
                 - self._result_recorder.files_transferred
             )
         )
-
+        LOGGER.debug("Remaining Files %s", remaining_files)
         # Create the display statement.
         if self._result_recorder.expected_bytes_transferred > 0:
             bytes_completed = human_readable_size(
@@ -513,6 +519,7 @@ class ResultPrinter(BaseResultHandler):
         self._print_to_out_file(progress_statement)
 
     def _get_expected_total(self, expected_total):
+
         if not self._result_recorder.expected_totals_are_final():
             return self._ESTIMATED_EXPECTED_TOTAL.format(
                 expected_total=expected_total
@@ -539,10 +546,7 @@ class ResultPrinter(BaseResultHandler):
     def _clear_progress_if_no_more_expected_transfers(self, **kwargs):
         if self._progress_length and not self._has_remaining_progress():
             LOGGER.debug('Clearing progress as no more expected transfers ===========')
-            clear_statement = self._adjust_statement_padding('', ending_char='\r')
-            uni_print(clear_statement, self._out_file)
-            uni_print('', self._out_file)  # Add final newline
-            self._out_file.flush()
+            uni_print(self._adjust_statement_padding(''), self._out_file)
 
 
 class NoProgressResultPrinter(ResultPrinter):
