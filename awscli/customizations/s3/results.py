@@ -330,8 +330,8 @@ class ResultRecorder(BaseResultHandler):
 
     def _record_final_expected_files(self, result, **kwargs):
         LOGGER.debug("Total submission %s",result.total_submissions)
-        # LOGGER.debug("Expected files %s", self.files_skipped)
-        self.final_expected_files_transferred = result.total_submissions
+        LOGGER.debug("Expected files %s", self.files_skipped)
+        self.final_expected_files_transferred = result.total_submissions + self.files_skipped
 
 
 class ResultPrinter(BaseResultHandler):
