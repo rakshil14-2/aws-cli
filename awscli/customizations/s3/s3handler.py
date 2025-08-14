@@ -563,7 +563,7 @@ class CopyRequestSubmitter(BaseTransferRequestSubmitter):
             self._result_queue.put(
                 QueuedResult(total_transfer_size=0, **result_kwargs)
             )
-            self._result_queue.put(SuccessResult(**result_kwargs))
+            self._result_queue.put(SkippedResult(**result_kwargs))
             return True
         except ClientError as e:
             if e.response['Error']['Code'] == '404':
