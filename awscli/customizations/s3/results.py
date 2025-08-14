@@ -294,7 +294,8 @@ class ResultRecorder(BaseResultHandler):
         self.files_transferred += 1
 
     def _record_skipped_result(self, result, **kwargs):
-        # self._pop_result_from_ongoing_dicts(result)
+        # Clean up ongoing progress tracking for skipped files
+        self._pop_result_from_ongoing_dicts(result)
         LOGGER.debug("I am here in skipped Result")
         LOGGER.debug("========")
         self.files_transferred += 1
@@ -533,7 +534,7 @@ class ResultPrinter(BaseResultHandler):
 
     def _clear_progress_if_no_more_expected_transfers(self, **kwargs):
         if self._progress_length and not self._has_remaining_progress():
-            # uni_print(self._adjust_statement_padding(''), self._out_file)
+            LOGGER.debug('Clearing progress as no more expected transfers ===========')
             clear_statement = self._adjust_statement_padding('', ending_char='\r')
             uni_print(clear_statement, self._out_file)
             uni_print('', self._out_file)  # Add final newline
