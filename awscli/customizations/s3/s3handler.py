@@ -463,15 +463,15 @@ class DownloadRequestSubmitter(BaseTransferRequestSubmitter):
         if not self._cli_params.get('no_overwrite'):
             return False
         fileout = self._get_fileout(fileinfo)
-
+        src, dest = self._format_src_dest(fileinfo)
         if os.path.exists(fileout):
             LOGGER.debug(
-                f"warning: skipping {fileinfo.src} -> {fileinfo.dest}, file exists at destination"
+                f"warning: skipping {src} -> {dest}, file exists at destination"
             )
             result_kwargs = {
                 'transfer_type': 'download',
-                'src': fileinfo.src,
-                'dest': fileinfo.dest,
+                'src': src,
+                'dest': dest,
             }
             self._result_queue.put(
                 QueuedResult(total_transfer_size=0, **result_kwargs)
@@ -549,20 +549,21 @@ class CopyRequestSubmitter(BaseTransferRequestSubmitter):
 
         bucket, key = find_bucket_key(fileinfo.dest)
         client = fileinfo.source_client
+        src, dest = self._format_src_dest(fileinfo)
         try:
             client.head_object(Bucket=bucket, Key=key)
             LOGGER.debug(
-                f"warning: skipping {fileinfo.src} -> {fileinfo.dest}, file exists at destination"
+                f"warning: skipping {src} -> {dest}, file exists at destination"
             )
             result_kwargs = {
                 'transfer_type': 'copy',
-                'src': fileinfo.src,
-                'dest': fileinfo.dest,
+                'src': src,
+                'dest':dest,
             }
             self._result_queue.put(
                 QueuedResult(total_transfer_size=0, **result_kwargs)
             )
-            self._result_queue.put(SkippedResult(**result_kwargs))
+            self._result_queue.put(SuccessResult(**result_kwargs))
             return True
         except ClientError as e:
             if e.response['Error']['Code'] == '404':

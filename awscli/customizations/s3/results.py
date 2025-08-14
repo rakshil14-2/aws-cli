@@ -133,7 +133,7 @@ class DoneResultSubscriber(BaseResultSubscriber, OnDoneFilteredSubscriber):
                 f"warning: skipping {self._src} -> {self._dest}, file exists at destination"
             )
             self._result_queue.put(
-                SkippedResult(
+                SuccessResult(
                     transfer_type=self._transfer_type,
                     src=self._src,
                     dest=self._dest,
